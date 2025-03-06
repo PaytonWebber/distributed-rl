@@ -1,34 +1,68 @@
 import zmq
+import zmq.asyncio
+import asyncio
 import numpy as np
 
-context = zmq.Context()
+ctx = zmq.asyncio.Context()
 
 # SUB socket to receive model weights
-sub_socket = context.socket(zmq.SUB)
+sub_socket = ctx.socket(zmq.SUB)
+sub_socket.setsockopt(zmq.SUBSCRIBE, b"")
 sub_socket.connect("tcp://localhost:5557")
-sub_socket.setsockopt_string(zmq.SUBSCRIBE, "")
 
 # PUSH socket to send experiences
-actor_socket = context.socket(zmq.PUSH)
-actor_socket.connect("tcp://localhost:5556")
+push_socket = ctx.socket(zmq.PUSH)
+push_socket.connect("tcp://localhost:5556")
 
-# Step 2: Wait for Initial Model Weights
+# Global variables for model weights and hash
 model_weights = None
-while model_weights is None:
-    print("[Actor] Waiting for Initial Weights from Server...")
-    weights_message = sub_socket.recv()
-    model_weights = np.frombuffer(weights_message[:-32], dtype=np.float64)
-    model_hash = weights_message[-32:].decode("utf-8")
-    print(f"[Actor] Received Initial Weights: {model_weights}, Hash: {model_hash}")
+model_hash = None
 
-while True:
-    # Step 6: Receive Updated Model Weights
-    weights_message = sub_socket.recv()
-    model_weights = np.frombuffer(weights_message[:-32], dtype=np.float64)
-    model_hash = weights_message[-32:].decode("utf-8")
-    print(f"[Actor] Received Updated Weights: {model_weights}, Hash: {model_hash}")
 
-    # Step 3: Send Experience with Hash
-    experience = np.random.rand(4)
-    actor_socket.send(experience.tobytes() + model_hash.encode("utf-8"))
-    print(f"[Actor] Sent Experience: {experience}, Hash: {model_hash}")
+def extract_weights_and_hash(message):
+    """Extract weights and hash from the received model weights message."""
+    model_weights = np.frombuffer(message[:-32], dtype=np.float64)
+    model_hash = message[-32:]
+    return model_weights, model_hash
+
+
+async def receive_weights():
+    """Receives weights and stores the latest hash."""
+    global model_weights, model_hash
+
+    # Wait for initial weights
+    message = await sub_socket.recv()
+    model_weights, model_hash = extract_weights_and_hash(message)
+    # print(f"[Actor] Received Initial Weights: {model_weights}, Hash: {model_hash.decode(errors='ignore')}")
+
+    while True:
+        message = await sub_socket.recv()
+        model_weights, model_hash = extract_weights_and_hash(message)
+        # print(f"[Actor] Updated Weights: {model_weights}, Hash: {model_hash.decode(errors='ignore')}")
+
+
+async def generate_experience():
+    """Continuously generates experience while having weights."""
+    global model_weights, model_hash  # 🔥 FIX: Ensure global access
+
+    while model_weights is None:
+        await asyncio.sleep(0.1)  # Wait for first weights
+
+    while True:
+        # Generate experience at a high rate
+        experience = np.random.rand(4)
+        experience_with_hash = experience.tobytes() + model_hash  # Attach hash
+        await push_socket.send(experience_with_hash)
+        await asyncio.sleep(0.01)  # Generate experiences every 10ms
+
+
+async def main():
+    """Handles actor interactions asynchronously."""
+    await asyncio.gather(
+        receive_weights(),
+        generate_experience(),
+    )
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

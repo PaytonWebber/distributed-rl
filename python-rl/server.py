@@ -1,113 +1,97 @@
 import zmq
-import time
+import zmq.asyncio
+import asyncio
 import numpy as np
-import threading
 import hashlib
 
-# Constants
-BUFFER_SIZE = 4  # Number of experiences before sending to the learner
-experience_buffer = []  # Stores experiences
-model_weights = None  # Stores current model weights
-model_hash = None  # Stores model weight hash
+BUFFER_SIZE = 1000
+experience_buffer = []
+model_weights = None
+model_hash = None
+
+ctx = zmq.asyncio.Context()
+
+# Sockets
+actor_socket = ctx.socket(zmq.PULL)
+actor_socket.bind("tcp://0.0.0.0:5556")
+
+learner_push_socket = ctx.socket(zmq.PUSH)
+learner_push_socket.bind("tcp://0.0.0.0:5558")
+
+learner_socket = ctx.socket(zmq.ROUTER)
+learner_socket.bind("tcp://0.0.0.0:5555")
+
+pub_socket = ctx.socket(zmq.PUB)
+pub_socket.bind("tcp://0.0.0.0:5557")
 
 
 def generate_hash(data):
     """Generate a hash from a NumPy array to track weight versions."""
-    return hashlib.md5(data.tobytes()).hexdigest()
+    return hashlib.md5(data.tobytes()).hexdigest().encode("utf-8")
 
 
-def handle_learner_weights(learner_pull_socket, learner_push_socket, pub_socket):
+async def handle_learner_weights():
     """Handles receiving initial & updated weights from learner."""
     global model_weights, model_hash
 
-    # Step 1: Receive Initial Weights from Learner
-    model_weights = np.frombuffer(learner_pull_socket.recv(), dtype=np.float64)
-    model_hash = generate_hash(model_weights)
-    print(f"[Learner] Received Initial Weights: {model_weights}, Hash: {model_hash}")
-
-    # Step 2: Publish Initial Weights to Actors
-    pub_socket.send(model_weights.tobytes() + model_hash.encode("utf-8"))
-    print("[Server] Published Initial Weights to Actors.")
-
     while True:
-        # Step 5: Receive New Weights from Learner
-        new_weights = np.frombuffer(learner_pull_socket.recv(), dtype=np.float64)
-        model_hash = generate_hash(new_weights)
-        print(f"[Learner] Received Updated Weights: {new_weights}, Hash: {model_hash}")
+        frames = await learner_socket.recv_multipart()
+        weights_bytes = frames[-1]  # Extract weights
+        model_weights = np.frombuffer(weights_bytes, dtype=np.float64)
+        model_hash = generate_hash(model_weights)
+        # print(f"[Learner] Received Weights: {model_weights}, Hash: {model_hash.decode()}")
 
-        # Step 6: Publish New Weights to Actors
-        model_weights = new_weights
-        pub_socket.send(model_weights.tobytes() + model_hash.encode("utf-8"))
-        print("[Server] Published Updated Weights to Actors.")
+        # Publish new weights
+        await pub_socket.send(model_weights.tobytes() + model_hash)
 
 
-def handle_experience(actor_socket, learner_push_socket):
+async def handle_experience():
     """Handles experience collection from actors and sends mini-batches to learner."""
     global experience_buffer
 
     while True:
-        # Step 3: Receive Experience with Hash
-        message = actor_socket.recv()
-        received_hash = message[-32:].decode("utf-8")  # Extract last 32 bytes as hash
-        experience = np.frombuffer(message[:-32], dtype=np.float64)  # Extract data
-
-        print(f"[Actor] Received Experience: {experience}, Hash: {received_hash}")
+        message = await actor_socket.recv()
+        experience_bytes, received_hash = message[:-32], message[-32:]
 
         if received_hash != model_hash:
-            print("[Warning] Mismatched Model Hash! Experience ignored.")
+            print("[Server] Ignored Outdated Experience.")
             continue  # Ignore outdated experiences
 
+        experience = np.frombuffer(experience_bytes, dtype=np.float64)
         experience_buffer.append(experience)
 
-        # Step 4: Once buffer is full, send mini-batch to learner
         if len(experience_buffer) >= BUFFER_SIZE:
-            mini_batch = np.stack(experience_buffer)  # Convert list to NumPy array
-            experience_buffer.clear()  # Clear buffer after sending
-            print(f"[Server] Sending Mini-Batch to Learner:\n{mini_batch}")
-
-            learner_push_socket.send(mini_batch.tobytes())  # **PUSH mini-batch to learner**
+            mini_batch = np.stack(experience_buffer)
+            experience_buffer.clear()
+            await send_mini_batch(mini_batch)
 
 
-def handle_weight_publish(pub_socket):
-    """Handles publishing weights to actors."""
+async def send_mini_batch(mini_batch):
+    """Send mini-batch asynchronously to learner."""
+    # print(f"[Server] Sending Mini-Batch to Learner:\n{mini_batch}")
+    await learner_push_socket.send(mini_batch.tobytes())
+
+
+async def handle_weight_publish():
+    """Continuously publishes weights even if they don't change."""
+    global model_weights
     while model_weights is None:
-        print("[Server] Waiting for Initial Weights from Learner...")
-        time.sleep(1)
+        await asyncio.sleep(0.1)  # Wait for initial weights
 
     while True:
-        time.sleep(5)  # Publish periodically
-        pub_socket.send(model_weights.tobytes() + model_hash.encode("utf-8"))
-        print("[Server] Periodically Published Weights to Actors.")
+        await asyncio.sleep(0.05)  # Publish every 50ms
+        await pub_socket.send(model_weights.tobytes() + model_hash)
+        # print("[Server] Published Weights to Actors.")
 
 
-def main():
-    context = zmq.Context()
-
-    # Socket for receiving experiences from actors
-    actor_socket = context.socket(zmq.PULL)
-    actor_socket.bind("tcp://0.0.0.0:5556")
-
-    # **Change to PULL to receive initial weights first**
-    learner_pull_socket = context.socket(zmq.PULL)
-    learner_pull_socket.bind("tcp://0.0.0.0:5555")
-
-    # **Use PUSH to send mini-batches to learner**
-    learner_push_socket = context.socket(zmq.PUSH)
-    learner_push_socket.bind("tcp://0.0.0.0:5558")
-
-    # Socket for publishing new weights to actors
-    pub_socket = context.socket(zmq.PUB)
-    pub_socket.bind("tcp://0.0.0.0:5557")
-
-    # Start handlers in separate threads
-    threading.Thread(target=handle_learner_weights, args=(learner_pull_socket, learner_push_socket, pub_socket), daemon=True).start()
-    threading.Thread(target=handle_experience, args=(actor_socket, learner_push_socket), daemon=True).start()
-    threading.Thread(target=handle_weight_publish, args=(pub_socket,), daemon=True).start()
-
-    print("[Server] Running...")
-    while True:
-        time.sleep(1)  # Keep the main thread alive
+async def main():
+    """Start all tasks asynchronously."""
+    await asyncio.gather(
+        handle_learner_weights(),
+        handle_experience(),
+        handle_weight_publish(),
+    )
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

@@ -1,35 +1,47 @@
 import zmq
+import zmq.asyncio
+import asyncio
 import numpy as np
+import time  # 🔥 Import time to track batch arrival times
 
-context = zmq.Context()
+ctx = zmq.asyncio.Context()
 
-# **PUSH socket to send updated weights to server**
-learner_push_socket = context.socket(zmq.PUSH)
-learner_push_socket.connect("tcp://localhost:5555")
+# DEALER Socket for Bi-Directional Communication
+learner_socket = ctx.socket(zmq.DEALER)
+learner_socket.connect("tcp://localhost:5555")
 
-# **PULL socket to receive mini-batches from server**
-learner_pull_socket = context.socket(zmq.PULL)
-learner_pull_socket.connect("tcp://localhost:5558")
+# PULL Socket to Receive Mini-Batches
+mini_batch_socket = ctx.socket(zmq.PULL)
+mini_batch_socket.connect("tcp://localhost:5558")
 
-# Step 1: Send Initial Model Weights to Server (No Acknowledgment Expected)
-initial_weights = np.random.rand(10)  # Example: 10 model weights
-learner_push_socket.send(initial_weights.tobytes())  # Send initial weights
-print(f"[Learner] Sent Initial Weights: {initial_weights}")
 
-# Step 2: **Wait for the first mini-batch from server**
-mini_batch_bytes = learner_pull_socket.recv()  # **PULL socket receives data**
-mini_batch = np.frombuffer(mini_batch_bytes, dtype=np.float64).reshape(-1, 4)  # Deserialize
-print(f"[Learner] Received First Mini-Batch:\n{mini_batch}")
+async def main():
+    """Handles learner interactions asynchronously."""
 
-while True:
-    # Step 3: Receive Mini-Batch from Server (Binary Data)
-    mini_batch_bytes = learner_pull_socket.recv()  # **Use PULL socket**
-    mini_batch = np.frombuffer(mini_batch_bytes, dtype=np.float64).reshape(-1, 4)  # Deserialize
-    print(f"[Learner] Received Mini-Batch:\n{mini_batch}")
+    # Step 1: Send Initial Model Weights
+    initial_weights = np.random.rand(10)
+    await learner_socket.send_multipart([b"identity", initial_weights.tobytes()])
+    print(f"[Learner] Sent Initial Weights: {initial_weights}")
 
-    # Process mini-batch (Simulated learning step)
-    new_weights = np.random.rand(10)  # Generate new weights
+    last_time = time.time()  # 🔥 Track the time of the last received batch
 
-    # Step 4: Send Updated Weights to Server
-    learner_push_socket.send(new_weights.tobytes())  # Serialize and send
-    print(f"[Learner] Sent Updated Weights: {new_weights}")
+    while True:
+        mini_batch_bytes = await mini_batch_socket.recv()
+        current_time = time.time()  # 🔥 Get the time of the new batch
+        elapsed_time = current_time - last_time  # 🔥 Calculate time since last batch
+        last_time = current_time  # 🔥 Update last received time
+
+        mini_batch = np.frombuffer(mini_batch_bytes, dtype=np.float64).reshape(-1, 4)
+        # print(f"[Learner] Received Mini-Batch:\n{mini_batch}")
+        print(f"⏳ Time since last batch: {elapsed_time:.6f} seconds")  # 🔥 Print time difference
+
+        # Simulated learning step
+        new_weights = np.random.rand(10)
+
+        # Step 3: Send Updated Weights to Server
+        await learner_socket.send_multipart([b"identity", new_weights.tobytes()])
+        # print(f"[Learner] Sent Updated Weights")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
