@@ -22,11 +22,15 @@ class Actor:
             push_port=config["actor"]["ports"]["PUSH"],
             sub_port=config["actor"]["ports"]["SUB"],
         )
-        self.model_hash = "adfc134xkjlk134ASD"
-        self.model = None
+        self.model_hash = None
+        self.model_weights = None
 
     def start(self):
         while True:
+            model_update = self.client.get_model_update()
+            self.model_hash = model_update["model_hash"]
+            self.model_weights = model_update["weights"]
+            print(self.model_hash)
             time.sleep(5)
             states = np.random.rand(10, 9).tolist()
             policies = np.random.rand(10, 9).tolist()

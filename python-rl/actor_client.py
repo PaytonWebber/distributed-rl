@@ -1,4 +1,5 @@
 import zmq
+import json
 
 
 class ActorClient:
@@ -14,5 +15,8 @@ class ActorClient:
     def send_experience(self, experience):
         self.push_socket.send_json(experience)
 
-    def receieve_weights(self):
-        return self.sub_socket.recv()
+    def get_model_update(self):
+        reply = self.sub_socket.recv_string()
+        model_update = json.loads(reply)
+        return model_update
+
