@@ -168,3 +168,4 @@ cython_debug/
 
 .venv/
 target/
+config.yaml

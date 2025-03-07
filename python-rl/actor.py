@@ -1,12 +1,19 @@
 from actor_client import ActorClient
 import zmq
+import numpy as np
 
-if __name__ == "__main__":
-    context = zmq.Context()
-    client = ActorClient(context, "localhost")
-    for _ in range (5):
-        client.send_experience({
-            "state": [0, 1, 0],
-            "policy": [x for x in range(100000)],
-            "reward": 1.0,
-        })
+
+class Actor:
+    def __init__(self, config):
+        self.config = config
+        self.client = ActorClient(
+            config["server"]["ip"],
+            push_port=config["actor"]["ports"]["PUSH"],
+            sub_port=config["actor"]["ports"]["SUB"],
+        )
+        self.model = None
+
+    def start(self):
+        while True:
+            experience = np.random.rand(3, 2)
+            self.client.send_experience(f"experience: {experience}")
