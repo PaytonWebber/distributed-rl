@@ -53,6 +53,17 @@ async def handle_experience():
         message = await actor_socket.recv()
         experience_bytes, received_hash = message[:-32], message[-32:]
 
+        # print received_hash and current model_hash
+        # print(f"Received Hash: {received_hash}")
+        # print(f"Model Hash: {model_hash}")
+
+        # print experience buffer size
+        print(f"Experience Buffer Size: {len(experience_buffer)}")
+
+        if model_hash == b"0"*32:
+            print("[Server] Discarding experience (waiting for new weights)")
+            continue
+
         if received_hash != model_hash:
             print("[Server] Ignored Outdated Experience.")
             continue  # Ignore outdated experiences
@@ -66,10 +77,15 @@ async def handle_experience():
             await send_mini_batch(mini_batch)
 
 
+
 async def send_mini_batch(mini_batch):
     """Send mini-batch asynchronously to learner."""
     # print(f"[Server] Sending Mini-Batch to Learner:\n{mini_batch}")
+    global model_hash
+
     await learner_push_socket.send(mini_batch.tobytes())
+
+    model_hash = b"0" * 32
 
 
 async def handle_weight_publish():

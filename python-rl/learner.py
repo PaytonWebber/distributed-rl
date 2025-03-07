@@ -29,18 +29,22 @@ async def main():
         mini_batch_bytes = await mini_batch_socket.recv()
         current_time = time.time()  # 🔥 Get the time of the new batch
         elapsed_time = current_time - last_time  # 🔥 Calculate time since last batch
-        last_time = current_time  # 🔥 Update last received time
 
         mini_batch = np.frombuffer(mini_batch_bytes, dtype=np.float64).reshape(-1, 4)
         # print(f"[Learner] Received Mini-Batch:\n{mini_batch}")
         print(f"⏳ Time since last batch: {elapsed_time:.6f} seconds")  # 🔥 Print time difference
 
+        # wait 5 seconds
+        await asyncio.sleep(5)        # print("waited 5 seconds")
+
         # Simulated learning step
         new_weights = np.random.rand(10)
 
+        last_time = time.time()  # 🔥 Update the time of the last received batch
         # Step 3: Send Updated Weights to Server
         await learner_socket.send_multipart([b"identity", new_weights.tobytes()])
         # print(f"[Learner] Sent Updated Weights")
+
 
 
 if __name__ == "__main__":
