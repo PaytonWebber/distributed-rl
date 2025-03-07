@@ -4,7 +4,6 @@ import zmq
 class ActorClient:
     def __init__(self, server_ip, push_port=5555, sub_port=5556):
         self.context = zmq.Context()
-
         self.push_socket = self.context.socket(zmq.PUSH)
         self.push_socket.connect(f"tcp://{server_ip}:{push_port}")
 

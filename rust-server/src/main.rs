@@ -1,10 +1,20 @@
 use futures::future::join3;
+use serde::{Deserialize, Serialize};
+use serde_json;
 use std::sync::Arc;
 use tokio;
 use tokio::sync::Mutex;
 use zeromq::*;
 
-async fn run_pull_task(mut pull_socket: PullSocket, replay_buffer: Arc<Mutex<Vec<String>>>) {
+#[derive(Debug, Deserialize, Serialize)]
+struct Experience {
+    model_hash: String,
+    states: Vec<Vec<f64>>,
+    policies: Vec<Vec<f64>>,
+    rewards: Vec<Vec<f64>>,
+}
+
+async fn run_pull_task(mut pull_socket: PullSocket, replay_buffer: Arc<Mutex<Vec<Experience>>>) {
     loop {
         let recv_message: String = match pull_socket.recv().await {
             Err(e) => {
@@ -13,8 +23,17 @@ async fn run_pull_task(mut pull_socket: PullSocket, replay_buffer: Arc<Mutex<Vec
             }
             Ok(msg) => msg.try_into().unwrap(),
         };
+
+        let experience: Experience = match serde_json::from_str(&recv_message) {
+            Ok(exp) => exp,
+            Err(e) => {
+                eprintln!("Direct parsing failed: {}", e);
+                continue;
+            }
+        };
+
         let mut buffer = replay_buffer.lock().await;
-        buffer.push(recv_message);
+        buffer.push(experience);
         println!("Updated replay buffer: {:?}", *buffer);
     }
 }
@@ -33,7 +52,7 @@ async fn run_pub_task(mut pub_socket: PubSocket) {
     }
 }
 
-async fn run_rep_task(mut rep_socket: RepSocket, replay_buffer: Arc<Mutex<Vec<String>>>) {
+async fn run_rep_task(mut rep_socket: RepSocket, replay_buffer: Arc<Mutex<Vec<Experience>>>) {
     loop {
         let _recv_message: String = match rep_socket.recv().await {
             Err(e) => {
@@ -45,12 +64,24 @@ async fn run_rep_task(mut rep_socket: RepSocket, replay_buffer: Arc<Mutex<Vec<St
 
         let mut buffer = replay_buffer.lock().await;
         if buffer.len() < 4 {
+            let reply = ZmqMessage::from("NOT ENOUGH EXPERIENCES");
+            if let Err(e) = rep_socket.send(reply).await {
+                eprintln!("Error sending reply on REP socket: {:?}", e);
+            }
             continue;
         }
         let experience = buffer.pop().unwrap();
         drop(buffer);
 
-        let send_msg = ZmqMessage::from(experience);
+        let send_json = match serde_json::to_string(&experience) {
+            Ok(json) => json,
+            Err(e) => {
+                eprintln!("Error serializing experience: {}", e);
+                continue;
+            }
+        };
+
+        let send_msg = ZmqMessage::from(send_json);
         if let Err(e) = rep_socket.send(send_msg).await {
             eprintln!("Error sending reply on REP socket: {:?}", e);
         }
@@ -68,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut rep_socket = RepSocket::new();
     rep_socket.bind("tcp://0.0.0.0:5557").await?;
 
-    let replay_buffer = Arc::new(Mutex::new(Vec::<String>::new()));
+    let replay_buffer = Arc::new(Mutex::new(Vec::<Experience>::new()));
 
     let pull_buffer = Arc::clone(&replay_buffer);
     let rep_buffer = Arc::clone(&replay_buffer);
