@@ -31,7 +31,6 @@ class Actor:
             self.model_hash = model_update["model_hash"]
             self.model_weights = model_update["weights"]
             print(self.model_hash)
-            time.sleep(5)
             states = np.random.rand(10, 9).tolist()
             policies = np.random.rand(10, 9).tolist()
             rewards = np.random.rand(10, 1).tolist()

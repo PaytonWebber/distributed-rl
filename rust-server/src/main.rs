@@ -74,7 +74,7 @@ async fn publish_weights(mut pub_socket: PubSocket, latest_model: Arc<Mutex<Opti
                 println!("No model update available yet.");
             }
         }
-        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 }
 

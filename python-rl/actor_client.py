@@ -10,6 +10,7 @@ class ActorClient:
 
         self.sub_socket = self.context.socket(zmq.SUB)
         self.sub_socket.connect(f"tcp://{server_ip}:{sub_port}")
+        self.sub_socket.setsockopt(zmq.CONFLATE, 1)
         self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "")
 
     def send_experience(self, experience):
