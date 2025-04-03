@@ -10,7 +10,7 @@ enum class Player { Black, White };
 
 enum class Cell { Empty, Black, White };
 
-Player other(Player p) {
+inline Player other(Player p) {
   return (p == Player::Black) ? Player::White : Player::Black;
 }
 

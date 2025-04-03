@@ -7,12 +7,12 @@
 #include <vector>
 #include <limits>
 #include <algorithm>
-#include <random>
+// #include <random>
 #include <ctime>
 #include <torch/torch.h>
 #include "az_net.hpp"
 
-std::vector<float> sample_dirichlet(float alpha, int size) {
+inline std::vector<float> sample_dirichlet(float alpha, int size) {
     static thread_local std::mt19937 rng(std::random_device{}());
     std::gamma_distribution<float> gamma_dist(alpha, 1.0f);
 
