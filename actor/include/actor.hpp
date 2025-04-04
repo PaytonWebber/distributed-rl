@@ -16,7 +16,7 @@ int sample_from_policy(const std::vector<float> &policy);
 
 class Actor {
   public:
-    Actor(AZNet net, float C, int64_t simulations);
+    Actor(AZNet &net, torch::Device &device, float C, int64_t simulations);
 
     std::vector<Experience> self_play();
 

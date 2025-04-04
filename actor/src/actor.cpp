@@ -6,8 +6,8 @@ int sample_from_policy(const std::vector<float> &policy) {
   return dist(gen);
 }
 
-Actor::Actor(AZNet net, float C, int64_t simulations) :
-  mcts(net, C, simulations, true) {}
+Actor::Actor(AZNet &net, torch::Device &device, float C, int64_t simulations) :
+  mcts(net, device, C, simulations, true) {}
 
 std::vector<Experience> Actor::self_play() {
   std::vector<Experience> game_samples;
