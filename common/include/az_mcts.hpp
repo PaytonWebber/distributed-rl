@@ -7,7 +7,7 @@
 #include <vector>
 #include <limits>
 #include <algorithm>
-// #include <random>
+#include <random>
 #include <ctime>
 #include <torch/torch.h>
 #include "az_net.hpp"
@@ -60,12 +60,13 @@ struct Node {
 class MCTS {
 public:
   AZNet network;
+  torch::Device device;
   float C;
   int simulations;
   bool training;
 
-  MCTS(AZNet net, float C = 1.414, int sims = 100, bool train = false)
-    : network(net), C(C), simulations(sims), training(train)
+  MCTS(AZNet &net, torch::Device &device, float C = 1.414, int sims = 100, bool train = false)
+    : network(net), device(device), C(C), simulations(sims), training(train)
   {}
 
   template <typename State>
@@ -134,7 +135,7 @@ public:
     State state = leaf->state;
 
     torch::Tensor input = torch::tensor(state.board()).reshape({2, 8, 8}).unsqueeze(0);
-    input = input.to(torch::kF32);
+    input = input.to(device);
     NetOutputs outputs = network->forward(input);
     auto policy_probs = torch::softmax(outputs.pi, /*dim=*/1).flatten();
     float value = outputs.v.item<float>();
