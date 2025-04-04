@@ -1,48 +1,29 @@
-use serde::{Deserialize, Serialize};
-use serde_json;
+mod experience;
+mod replay_buffer;
+mod zmq_handler;
+
+use futures::future::join;
+use replay_buffer::ReplayBuffer;
+use std::sync::Arc;
 use tokio;
+use tokio::sync::Mutex;
 use zeromq::*;
-
-#[derive(Debug, Deserialize, Serialize)]
-struct Experience {
-    state: Vec<f32>,
-    policy: Vec<f32>,
-    reward: f32,
-}
-
-async fn pull_experiences(mut pull_socket: PullSocket) {
-    loop {
-        let recv_message: String = match pull_socket.recv().await {
-            Err(e) => {
-                eprintln!("Error receiving pull message: {}", e);
-                continue;
-            }
-            Ok(msg) => msg.try_into().unwrap(),
-        };
-
-        let experiences: Result<Vec<Experience>, _> = serde_json::from_str(&recv_message);
-        match experiences {
-            Ok(exps) => {
-                println!("Received {} experiences:", exps.len());
-                for e in exps {
-                    println!("{:?}", e);
-                }
-            }
-            Err(e) => {
-                eprintln!("Failed to parse JSON: {}", e);
-            }
-        }
-    }
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(1000)));
+
     let mut pull_socket = PullSocket::new();
     pull_socket.bind("tcp://0.0.0.0:5555").await?;
+    let pull_buffer = Arc::clone(&replay_buffer);
+    let pull_task = zmq_handler::pull_experiences(pull_socket, pull_buffer);
 
-    let pull_task = pull_experiences(pull_socket);
+    let mut rep_socket = RepSocket::new();
+    rep_socket.bind("tcp://0.0.0.0:5556").await?;
+    let rep_buffer = Arc::clone(&replay_buffer);
+    let rep_task = zmq_handler::rep_task(rep_socket, rep_buffer);
 
-    // join3(pull_task, pub_task, rep_task).await;
-    pull_task.await;
+    join(pull_task, rep_task).await;
+
     Ok(())
 }
