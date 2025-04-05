@@ -11,7 +11,7 @@ use zeromq::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(1000)));
+    let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(10000)));
 
     let mut pull_socket = PullSocket::new();
     pull_socket.bind("tcp://0.0.0.0:5555").await?;

@@ -1,8 +1,15 @@
 #include "learner.hpp"
+#include <torch/serialize.h>
 #include <nlohmann/json.hpp>
+#include <torch/serialize/input-archive.h>
+#include <torch/serialize/output-archive.h>
 #include <zmq.hpp>
+#include <sstream>
+#include <string>
 
 using json = nlohmann::json;
+
+
 
 void from_json(const json& j, Experience& e) {
     j.at("state").get_to(e.state);
@@ -11,6 +18,9 @@ void from_json(const json& j, Experience& e) {
 }
 
 int main() {
+  const std::string OK = "OK";
+  const std::string NO = "NO";
+
   Config config {1e-3, "models/"};
   torch::Device device(torch::cuda::is_available() ? torch::kCUDA : torch::kCPU);
   AZNet net = AZNet(2, 64, 65, 5);
@@ -20,25 +30,75 @@ int main() {
   zmq::socket_t sock(ctx, zmq::socket_type::req);
   sock.connect("tcp://localhost:5556");
 
+  zmq::message_t ack;
+  zmq::message_t batch_buffer;
+  int step_count = 0;
+
   while (true) {
+
+    /**************************************/
+    /*********** CONTROL FLOW 1 ***********/
+    /**************************************/
+    
+    // send (REQUEST)
     sock.send(zmq::buffer("REQUEST_BATCH"), zmq::send_flags::none);
 
-    zmq::message_t msg;
-    auto result = sock.recv(msg, zmq::recv_flags::none);
+    // receive (ACK)
+    auto result = sock.recv(ack, zmq::recv_flags::none);
     if (!result) {
       std::cerr << "Failed to receive message from socket." << std::endl;
       return 1;
     }
 
-    std::string json_str(static_cast<char *>(msg.data()), msg.size());
+    if (ack.to_string() == NO) { continue; }
+
+    /**************************************/
+    /*********** CONTROL FLOW 2 ***********/
+    /**************************************/
+
+    // send  (ACK)
+    sock.send(zmq::buffer("OK"), zmq::send_flags::none);
+
+    // receive (MINi-BATCH)
+    result = sock.recv(batch_buffer, zmq::recv_flags::none);
+    if (!result) {
+      std::cerr << "Failed to receive message from socket." << std::endl;
+      return 1;
+    }
+
+    std::string json_str(static_cast<char *>(batch_buffer.data()), batch_buffer.size());
     json j = json::parse(json_str);
-
     std::vector<Experience> experiences = j.get<std::vector<Experience>>();
-
-    std::cout << "Received " << experiences.size() << " experiences."
-              << std::endl;
-
     learner.train_step(experiences);
+    step_count++;
+    std::cout << step_count << std::endl;
+
+    /**************************************/
+    /*********** CONTROL FLOW 3 ***********/
+    /**************************************/
+
+    if (step_count == 1000) {
+      // send (UPDATE)
+      sock.send(zmq::buffer("SENDING_PARAMETERS"), zmq::send_flags::none);
+
+      // receive (ACK)
+      auto result = sock.recv(ack, zmq::recv_flags::none); 
+
+      torch::serialize::OutputArchive archive;  
+      std::ostringstream oss;
+
+      net->save(archive);
+      archive.save_to(oss);
+      std::string serialized_parameters = oss.str();
+
+      // send (PARAMETERS)
+      sock.send(zmq::buffer(serialized_parameters), zmq::send_flags::none);
+
+      // receive (ACK)
+      result = sock.recv(ack, zmq::recv_flags::none); 
+
+      step_count = 0;
+    }
   }
 
   return 0;

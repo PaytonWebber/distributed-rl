@@ -12,22 +12,24 @@ AZNetImpl::AZNetImpl(int64_t in_channels, int64_t board_size, int64_t policy_siz
   conv_v(conv1x1(128, 1)),
   bn_v(1),
   fc1_v(board_size, 128),
-  fc2_v(128, 1) {
-  register_module("relu", relu);
+  fc2_v(128, 1),
+  relu(torch::nn::ReLU()) {
   // encoding
   register_module("conv_in", conv_in);
   register_module("bn_in", bn_in);
-  // resnet
+
   register_module("blocks", blocks);
-  // policy head
+
   register_module("conv_p", conv_p);
   register_module("bn_p", bn_p);
   register_module("fc_p", fc_p);
-  // value head
+
   register_module("conv_v", conv_v);
   register_module("bn_v", bn_v);
   register_module("fc1_v", fc1_v);
   register_module("fc2_v", fc2_v);
+
+  register_module("relu", relu);
 }
 
 NetOutputs AZNetImpl::forward(torch::Tensor x) {
