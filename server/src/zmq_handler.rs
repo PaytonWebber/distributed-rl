@@ -3,6 +3,7 @@ use crate::replay_buffer::ReplayBuffer;
 use serde_json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::time::{Duration, sleep};
 use zeromq::*;
 
 pub async fn pull_experiences(
@@ -32,7 +33,11 @@ pub async fn pull_experiences(
     }
 }
 
-pub async fn rep_task(mut rep_socket: RepSocket, replay_buffer: Arc<Mutex<ReplayBuffer>>) {
+pub async fn rep_learner(
+    mut rep_socket: RepSocket,
+    replay_buffer: Arc<Mutex<ReplayBuffer>>,
+    params_buffer: Arc<Mutex<Vec<u8>>>,
+) {
     let request_message: String = "REQUEST_BATCH".to_string();
     let update_message: String = "SENDING_PARAMETERS".to_string();
     loop {
@@ -93,7 +98,7 @@ pub async fn rep_task(mut rep_socket: RepSocket, replay_buffer: Arc<Mutex<Replay
             }
 
             // receive (PARAMETERS)
-            let _parameters_bytes: Vec<u8> = match rep_socket.recv().await {
+            let parameters_bytes: Vec<u8> = match rep_socket.recv().await {
                 Err(e) => {
                     eprintln!("Error receiving from pull socket {}", e);
                     continue;
@@ -104,6 +109,23 @@ pub async fn rep_task(mut rep_socket: RepSocket, replay_buffer: Arc<Mutex<Replay
             if let Err(e) = rep_socket.send("OK".into()).await {
                 eprintln!("Failed to acknowledge parameter update: {}", e);
             }
+
+            let mut params = params_buffer.lock().await;
+            params.clone_from(&parameters_bytes);
         }
+    }
+}
+
+pub async fn publish_params(mut pub_socket: PubSocket, params_buffer: Arc<Mutex<Vec<u8>>>) {
+    loop {
+        let params = {
+            let locked = params_buffer.lock().await;
+            locked.clone()
+        };
+
+        if let Err(e) = pub_socket.send(params.into()).await {
+            eprintln!("Error sending model update on PUB socket: {:?}", e);
+        }
+        sleep(Duration::from_secs(5)).await;
     }
 }

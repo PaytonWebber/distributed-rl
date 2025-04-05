@@ -1,15 +1,12 @@
 #include "learner.hpp"
 #include <torch/serialize.h>
 #include <nlohmann/json.hpp>
-#include <torch/serialize/input-archive.h>
 #include <torch/serialize/output-archive.h>
 #include <zmq.hpp>
 #include <sstream>
 #include <string>
 
 using json = nlohmann::json;
-
-
 
 void from_json(const json& j, Experience& e) {
     j.at("state").get_to(e.state);
@@ -32,8 +29,27 @@ int main() {
 
   zmq::message_t ack;
   zmq::message_t batch_buffer;
-  int step_count = 0;
 
+  // send (UPDATE)
+  sock.send(zmq::buffer("SENDING_PARAMETERS"), zmq::send_flags::none);
+
+  // receive (ACK)
+  auto result = sock.recv(ack, zmq::recv_flags::none); 
+
+  torch::serialize::OutputArchive archive;  
+  std::ostringstream oss;
+
+  net->save(archive);
+  archive.save_to(oss);
+  std::string serialized_parameters = oss.str();
+
+  // send (PARAMETERS)
+  sock.send(zmq::buffer(serialized_parameters), zmq::send_flags::none);
+
+  // receive (ACK)
+  result = sock.recv(ack, zmq::recv_flags::none); 
+
+  int step_count = 0;
   while (true) {
 
     /**************************************/

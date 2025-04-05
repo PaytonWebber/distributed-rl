@@ -20,7 +20,8 @@ class Actor {
 
     std::vector<Experience> self_play();
 
+    AZNet &net;
+
   private:
     MCTS mcts;
-    
 };
