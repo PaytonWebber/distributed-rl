@@ -2,6 +2,7 @@
 
 ResidualBlockImpl::ResidualBlockImpl(int64_t in_channels, int64_t out_channels, int64_t stride) :
   conv1(conv3x3(in_channels, out_channels, stride)),
+  relu(torch::nn::ReLU()),
   bn1(out_channels),
   conv2(conv3x3(in_channels, out_channels, stride)),
   bn2(out_channels) {
