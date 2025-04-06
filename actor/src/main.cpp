@@ -13,14 +13,18 @@ void to_json(json& j, const Experience& e) {
 }
 
 int main() {
+  std::string const server_ip = "tcp://hq.servebeer.com:";
   zmq::context_t ctx;
+
   zmq::socket_t push_sock(ctx, zmq::socket_type::push);
-  push_sock.connect("tcp://localhost:5555");
+  std::string const push_port = "5555";
+  push_sock.connect(server_ip + push_port);
 
   zmq::socket_t sub_sock(ctx, zmq::socket_type::sub);
   sub_sock.set(zmq::sockopt::conflate, 1);
   sub_sock.set(zmq::sockopt::subscribe, "");
-  sub_sock.connect("tcp://localhost:5557");
+  std::string const sub_port = "5557";
+  sub_sock.connect(server_ip + sub_port);
 
   zmq::message_t params_buffer;
 
@@ -41,23 +45,27 @@ int main() {
 
   Actor actor(net, device, 1.414, 100);
 
+  int games_generated = 0;
   while (true) {
     std::vector<Experience> experiences = actor.self_play();
     json j = experiences;
     std::string msg = j.dump();
     push_sock.send(zmq::buffer(msg), zmq::send_flags::none);
 
-    auto result = sub_sock.recv(params_buffer, zmq::recv_flags::none);
-    if (!result) {
-      std::cerr << "Failed to receive message from socket." << std::endl;
-      return 1;
-    }
+    if (games_generated % 5) {
+      auto result = sub_sock.recv(params_buffer, zmq::recv_flags::none);
+      if (!result) {
+        std::cerr << "Failed to receive message from socket." << std::endl;
+        return 1;
+      }
 
-    std::string model_bytes(static_cast<char*>(params_buffer.data()), params_buffer.size());
-    std::istringstream iss(model_bytes, std::ios::binary);
-    torch::serialize::InputArchive archive;  
-    archive.load_from(iss);
-    actor.net->load(archive);
+      std::string model_bytes(static_cast<char*>(params_buffer.data()), params_buffer.size());
+      std::istringstream iss(model_bytes, std::ios::binary);
+      torch::serialize::InputArchive archive;  
+      archive.load_from(iss);
+      actor.net->load(archive);
+    }
+    games_generated++;
   }
 
   return 0;
