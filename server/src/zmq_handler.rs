@@ -61,7 +61,7 @@ pub async fn rep_learner(
         if recv_message == request_message {
             let buffer = replay_buffer.lock().await;
 
-            if buffer.len() < 1024 {
+            if buffer.len() < 2048 {
                 // send (ACK)
                 if let Err(e) = rep_socket.send("NO".into()).await {
                     eprintln!("Failed to acknowledge parameter update: {}", e);
@@ -83,7 +83,7 @@ pub async fn rep_learner(
                 Ok(msg) => msg,
             };
 
-            let batch = buffer.sample(32);
+            let batch = buffer.sample(64);
             drop(buffer);
 
             // send (BATCH)
