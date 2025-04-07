@@ -8,7 +8,7 @@ int sample_from_policy(const std::vector<float> &policy) {
 
 Actor::Actor(AZNet &net, torch::Device &device, float C, int64_t simulations) :
   net(net),
-  mcts(net, device, C, simulations, true) {}
+  mcts(std::ref(net), device, C, simulations, true) {}
 
 std::vector<Experience> Actor::self_play() {
   std::vector<Experience> game_samples;
