@@ -59,7 +59,7 @@ struct Node {
 
 class MCTS {
 public:
-  AZNet network;
+  AZNet &network;
   torch::Device device;
   float C;
   int simulations;
