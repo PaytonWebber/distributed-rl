@@ -65,6 +65,7 @@ int main() {
     std::cout << "Waiting for model parameters... " << std::endl;
     sleep(5);
   }
+  std::cout << "Received parameters. Starting self-play... " << std::endl;
 
   AZNet net = AZNet(2, 64, 65, 5);
   net->to(device);
@@ -79,6 +80,7 @@ int main() {
     push_sock.send(zmq::buffer(msg), zmq::send_flags::none);
 
     if (games_generated % 5) {
+      std::cout << "Total Games Generated: " << games_generated << std::endl;
       bool update = false;
       while (!param_queue.empty()) {
         update = param_queue.pop(param_bytes);

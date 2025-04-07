@@ -10,6 +10,7 @@ pub async fn pull_experiences(
     mut pull_socket: PullSocket,
     replay_buffer: Arc<Mutex<ReplayBuffer>>,
 ) {
+    let mut games_received = 0;
     loop {
         let recv_message: String = match pull_socket.recv().await {
             Err(e) => {
@@ -22,7 +23,12 @@ pub async fn pull_experiences(
         let experiences: Result<Vec<Experience>, _> = serde_json::from_str(&recv_message);
         match experiences {
             Ok(exps) => {
-                println!("Received {} experiences:", exps.len());
+                games_received += 1;
+                println!(
+                    "Received {} Experiences | Total Games Received: {}",
+                    exps.len(),
+                    games_received
+                );
                 let mut buffer = replay_buffer.lock().await;
                 for exp in exps {
                     buffer.push(exp);
