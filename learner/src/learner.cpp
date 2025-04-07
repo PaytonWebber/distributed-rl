@@ -2,12 +2,9 @@
 #include "az_net.hpp"
 #include <torch/optim/adagrad.h>
 
-Learner::Learner(AZNet &network, torch::Device &device, Config config) :
-  network(network),
-  device(device),
-  config(config),
-  optimizer(network->parameters(), torch::optim::AdamOptions(1e-3))
-  {}
+Learner::Learner(AZNet &network, torch::Device &device, Config config)
+    : network(network), device(device), config(config),
+      optimizer(network->parameters(), torch::optim::AdamOptions(1e-3)) {}
 
 void Learner::train_step(std::vector<Experience> &mini_batch) {
   network->train();
@@ -39,12 +36,20 @@ void Learner::train_step(std::vector<Experience> &mini_batch) {
   loss.backward();
   optimizer.step();
 
-  std::cout << std::fixed
-                << " | Value Loss: " << std::setw(8) << value_loss.item<float>()
-                << " | Policy Loss: " << std::setw(8)
-                << policy_loss.item<float>()
-                << " | Total Loss: " << std::setw(8) << loss.item<float>()
-                << std::endl;
-
+  std::cout << std::fixed << " | Value Loss: " << std::setw(8)
+            << value_loss.item<float>() << " | Policy Loss: " << std::setw(8)
+            << policy_loss.item<float>() << " | Total Loss: " << std::setw(8)
+            << loss.item<float>() << std::endl;
 }
 
+void Learner::save_chekpoint(int checkpoint) {
+  std::string checkpoint_path = config.checkpoint_dir + "model_iter_" +
+                                std::to_string(checkpoint) + ".pt";
+  torch::save(network, checkpoint_path);
+}
+
+void Learner::load_chekpoint(int checkpoint) {
+  std::string checkpoint_path = config.checkpoint_dir + "model_iter_" +
+                                std::to_string(checkpoint) + ".pt";
+  torch::load(network, checkpoint_path);
+}
