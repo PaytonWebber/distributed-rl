@@ -29,7 +29,6 @@ void sub_thread_fn(zmq::context_t &ctx, MessageQueue<std::string> &queue,
     auto result = sub_sock.recv(param_buffer, zmq::recv_flags::none);
     if (!result) { sleep(1); }
     else {
-      std::cout << "Received model parameters from server." << std::endl;
       std::string model_bytes(static_cast<char *>(param_buffer.data()),
                               param_buffer.size());
       queue.push(std::move(model_bytes));
@@ -90,6 +89,9 @@ int main() {
     }
     games_generated++;
   }
+
+  run = false;
+  if (sub_thread.joinable()) { sub_thread.join(); }
 
   return 0;
 }
