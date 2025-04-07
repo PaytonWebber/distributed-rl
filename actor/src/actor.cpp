@@ -19,8 +19,8 @@ int sample_from_policy(const std::vector<float> &policy,
 }
 
 float get_temperature(int move_count) {
-    const int early_move_threshold = 20;
-    const int mid_move_threshold = 40;
+    const int early_move_threshold = 10;
+    const int mid_move_threshold = 20;
 
     if (move_count < early_move_threshold) {
         return 1.0f;
