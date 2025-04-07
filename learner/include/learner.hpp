@@ -21,8 +21,9 @@ class Learner {
 
     void train_step(std::vector<Experience> &mini_batch);
 
-  private:
     AZNet network;
+
+  private:
     torch::Device device;
     Config config;
     torch::optim::Adam optimizer;

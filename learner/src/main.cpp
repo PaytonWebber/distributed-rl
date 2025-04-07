@@ -1,3 +1,4 @@
+#include "az_net.hpp"
 #include "learner.hpp"
 #include <torch/serialize.h>
 #include <nlohmann/json.hpp>
@@ -14,9 +15,18 @@ void from_json(const json& j, Experience& e) {
     j.at("reward").get_to(e.reward);
 }
 
+void serialize_parameters(AZNet &net, std::string& payload) {
+      torch::serialize::OutputArchive archive;  
+      std::ostringstream oss;
+      net->save(archive);
+      archive.save_to(oss);
+      payload = oss.str();
+}
+
 int main() {
   const std::string OK = "OK";
   const std::string NO = "NO";
+  std::string const server_ip = "tcp://hq.servebeer.com:";
 
   Config config {1e-3, "models/"};
   torch::Device device(torch::cuda::is_available() ? torch::kCUDA : torch::kCPU);
@@ -25,7 +35,8 @@ int main() {
   Learner learner(net, device, config);
   zmq::context_t ctx;
   zmq::socket_t sock(ctx, zmq::socket_type::req);
-  sock.connect("tcp://localhost:5556");
+  std::string const port = "5556";
+  sock.connect(server_ip + port);
 
   zmq::message_t ack;
   zmq::message_t batch_buffer;
@@ -36,13 +47,9 @@ int main() {
   // receive (ACK)
   auto result = sock.recv(ack, zmq::recv_flags::none); 
 
-  torch::serialize::OutputArchive archive;  
-  std::ostringstream oss;
-
-  net->save(archive);
-  archive.save_to(oss);
-  std::string serialized_parameters = oss.str();
-
+  std::string serialized_parameters;
+  serialize_parameters(std::ref(learner.network), serialized_parameters);
+  
   // send (PARAMETERS)
   sock.send(zmq::buffer(serialized_parameters), zmq::send_flags::none);
 
@@ -100,12 +107,7 @@ int main() {
       // receive (ACK)
       auto result = sock.recv(ack, zmq::recv_flags::none); 
 
-      torch::serialize::OutputArchive archive;  
-      std::ostringstream oss;
-
-      net->save(archive);
-      archive.save_to(oss);
-      std::string serialized_parameters = oss.str();
+      serialize_parameters(std::ref(learner.network), serialized_parameters);
 
       // send (PARAMETERS)
       sock.send(zmq::buffer(serialized_parameters), zmq::send_flags::none);
