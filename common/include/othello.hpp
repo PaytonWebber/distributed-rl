@@ -16,8 +16,8 @@ inline Player other(Player p) {
 
 class OthelloState {
 public:
-  static constexpr int SIZE = 8;
-  static constexpr int PASS = 64;
+  static constexpr int SIZE = 6;
+  static constexpr int PASS = 36;
 
   // row-major order
   uint64_t bitboard_black;
@@ -41,10 +41,10 @@ public:
       : bitboard_black(0), bitboard_white(0), current_player(Player::Black),
         pass_count(0) {
     // center positions
+    set_cell(2, 2, Player::White);
+    set_cell(2, 3, Player::Black);
+    set_cell(3, 2, Player::Black);
     set_cell(3, 3, Player::White);
-    set_cell(3, 4, Player::Black);
-    set_cell(4, 3, Player::Black);
-    set_cell(4, 4, Player::White);
   }
 
   bool is_terminal() const {
@@ -127,9 +127,9 @@ public:
     new_state.current_player = opp;
     return new_state;
   }
-
+  
   void render() const {
-    std::cout << "  A B C D E F G H\n";
+    std::cout << "  A B C D E F\n";
     for (int r = 0; r < SIZE; ++r) {
       std::cout << r + 1 << " ";
       for (int c = 0; c < SIZE; ++c) {
@@ -159,8 +159,8 @@ public:
 
   std::vector<float> board() const {
     std::vector<float> rep((SIZE * SIZE) * 2, 0.0); // two channels: one for each player's pieces
-    int black_offset = (current_player == Player::Black ? 0 : 64);
-    int white_offset = (current_player == Player::White ? 0 : 64);
+    int black_offset = (current_player == Player::Black ? 0 : SIZE * SIZE);
+    int white_offset = (current_player == Player::White ? 0 : SIZE * SIZE);
     for (int i = 0; i < (SIZE * SIZE); ++i) {
       if ((bitboard_black >> i) & 1ULL) {
         rep[i+black_offset] = 1.0;

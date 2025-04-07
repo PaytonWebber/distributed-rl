@@ -95,12 +95,12 @@ public:
       }
       backpropagate(leaf, -value);
     }
-    std::vector<float> action_probs(65, 0.0); // 8x8 board +1 for pass
+    std::vector<float> action_probs(37, 0.0); // 6x6 board +1 for pass
     float sumN = 0;
     for (auto& child : root->children) { 
       sumN += child->N; 
     }
-    int best_move = 65;
+    int best_move = 37;
     float best_prob = 0.0;
     for (auto& child : root->children) {
       float prob = child->N / sumN;
@@ -134,7 +134,7 @@ public:
   float expand_and_evaluate(std::shared_ptr<Node<State>> leaf) {
     State state = leaf->state;
 
-    torch::Tensor input = torch::tensor(state.board()).reshape({2, 8, 8}).unsqueeze(0);
+    torch::Tensor input = torch::tensor(state.board()).reshape({2, state.SIZE, state.SIZE}).unsqueeze(0);
     input = input.to(device);
     NetOutputs outputs = network->forward(input);
     auto policy_probs = torch::softmax(outputs.pi, /*dim=*/1).flatten();
