@@ -68,8 +68,8 @@ int main() {
   std::cout << "Received parameters. Starting self-play... " << std::endl;
 
   AZNet net = AZNet(2, 64, 65, 5);
-  net->to(device);
   update_params(std::ref(net), param_bytes);
+  net->to(device);
   Actor actor(std::ref(net), std::ref(device), 1.414, 400);
 
   int games_generated = 0;
@@ -86,7 +86,9 @@ int main() {
         update = param_queue.pop(param_bytes);
       }
       if (update) {
+        net->to(torch::kCPU);
         update_params(std::ref(net), param_bytes);
+        net->to(device);
       }
     }
     games_generated++;
