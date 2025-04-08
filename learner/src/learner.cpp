@@ -14,7 +14,7 @@ void Learner::train_step(std::vector<Experience> &mini_batch) {
   std::vector<float> rewards;
 
   for (size_t i = 0; i < mini_batch.size(); ++i) {
-    auto state_tensor = torch::tensor(mini_batch[i].state).reshape({2, 8, 8});
+    auto state_tensor = torch::tensor(mini_batch[i].state).reshape({2, 6, 6});
     auto policy_tensor = torch::tensor(mini_batch[i].policy);
     rewards.push_back(mini_batch[i].reward);
     state_tensors.push_back(state_tensor);
