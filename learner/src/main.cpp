@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
 
   torch::Device device(torch::cuda::is_available() ? torch::kCUDA : torch::kCPU);
 
-  AZNet net = AZNet(2, 36, 37, 3);
+  AZNet net = AZNet(2, 36, 37, 2);
   net->to(device);
   Learner learner(net, device, config);
 

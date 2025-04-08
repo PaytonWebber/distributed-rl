@@ -67,7 +67,7 @@ int main() {
   }
   std::cout << "Received parameters. Starting self-play... " << std::endl;
 
-  AZNet net = AZNet(2, 36, 37, 3);
+  AZNet net = AZNet(2, 36, 37, 2);
   update_params(std::ref(net), param_bytes);
   net->to(device);
   Actor actor(std::ref(net), std::ref(device), 1.414, 200);
