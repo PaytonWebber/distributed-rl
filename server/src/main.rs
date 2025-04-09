@@ -11,7 +11,7 @@ use zeromq::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(10000)));
+    let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(50000)));
     let model_params = Arc::new(Mutex::new(Vec::<u8>::new()));
 
     let mut pull_socket = PullSocket::new();

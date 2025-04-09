@@ -12,7 +12,8 @@ struct Experience {
   float reward;
 };
 
-int sample_from_policy(const std::vector<float> &policy);
+int sample_from_policy(const std::vector<float> &policy, const float temperature);
+float get_temperature(int move_count);
 
 class Actor {
   public:

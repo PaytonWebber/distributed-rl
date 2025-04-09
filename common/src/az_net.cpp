@@ -3,13 +3,13 @@
 #include <torch/nn/options/conv.h>
 
 AZNetImpl::AZNetImpl(int64_t in_channels, int64_t board_size, int64_t policy_size, int64_t num_blocks) :
-  conv_in(conv3x3(in_channels, 128)),
-  bn_in(128),
-  blocks(make_blocks(128, num_blocks)),
-  conv_p(conv1x1(128, 2)),
+  conv_in(conv3x3(in_channels, 256)),
+  bn_in(256),
+  blocks(make_blocks(256, num_blocks)),
+  conv_p(conv1x1(256, 2)),
   bn_p(2),
   fc_p(board_size*2, policy_size),
-  conv_v(conv1x1(128, 1)),
+  conv_v(conv1x1(256, 1)),
   bn_v(1),
   fc1_v(board_size, 128),
   fc2_v(128, 1),

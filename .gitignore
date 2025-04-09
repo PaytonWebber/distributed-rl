@@ -3,6 +3,7 @@ build/
 .cache/
 
 target/
+models/
 
 python-rl
 .venv/

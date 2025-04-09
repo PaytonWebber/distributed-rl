@@ -20,6 +20,8 @@ class Learner {
     Learner(AZNet &network, torch::Device &device, Config config);
 
     void train_step(std::vector<Experience> &mini_batch);
+    void save_chekpoint(int checkpoint);
+    void load_chekpoint(int checkpoint);
 
     AZNet network;
 

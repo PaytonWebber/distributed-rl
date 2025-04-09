@@ -10,6 +10,7 @@ pub async fn pull_experiences(
     mut pull_socket: PullSocket,
     replay_buffer: Arc<Mutex<ReplayBuffer>>,
 ) {
+    let mut games_received = 0;
     loop {
         let recv_message: String = match pull_socket.recv().await {
             Err(e) => {
@@ -22,7 +23,12 @@ pub async fn pull_experiences(
         let experiences: Result<Vec<Experience>, _> = serde_json::from_str(&recv_message);
         match experiences {
             Ok(exps) => {
-                println!("Received {} experiences:", exps.len());
+                games_received += 1;
+                println!(
+                    "Received {} Experiences | Total Games Received: {}",
+                    exps.len(),
+                    games_received
+                );
                 let mut buffer = replay_buffer.lock().await;
                 for exp in exps {
                     buffer.push(exp);
@@ -55,7 +61,7 @@ pub async fn rep_learner(
         if recv_message == request_message {
             let buffer = replay_buffer.lock().await;
 
-            if buffer.len() < 1024 {
+            if buffer.len() < 2048 {
                 // send (ACK)
                 if let Err(e) = rep_socket.send("NO".into()).await {
                     eprintln!("Failed to acknowledge parameter update: {}", e);
@@ -77,7 +83,7 @@ pub async fn rep_learner(
                 Ok(msg) => msg,
             };
 
-            let batch = buffer.sample(32);
+            let batch = buffer.sample(64);
             drop(buffer);
 
             // send (BATCH)
