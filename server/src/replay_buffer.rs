@@ -25,10 +25,9 @@ impl ReplayBuffer {
 
     pub fn sample(&self, batch_size: usize) -> Vec<Experience> {
         let mut rng = rng();
-        let experiences: Vec<Experience> = self.buffer.iter().cloned().collect();
-        experiences
+        self.buffer
             .iter()
-            .choose_multiple(&mut rng, batch_size.min(experiences.len()))
+            .choose_multiple(&mut rng, batch_size.min(self.buffer.len()))
             .into_iter()
             .cloned()
             .collect()
